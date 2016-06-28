@@ -1,0 +1,77 @@
+Instructions for check_pautas script
+
+1) Create a folder in /tmp like a script home.
+
+     Example:
+
+     mkdir /tmp/felipe/check_pautas
+
+2) Create the following directory under script home dir:
+
+          pautas_processed
+
+3) Copy the following files to script home directory:
+
+          check_pautas.py
+
+4) Create a list with a set of pauta to check, run the following command:
+
+     grep -il "ftp" <dir_base> 2>/dev/null > <output_file_name>
+
+     For Example:
+
+     grep -il "ftp" /u00/appl/base/bin/*  2>/dev/null | awk -F "/" '{print $6}' > listado_pautas_a_chequear_icalma.txt
+
+
+5) Change base_dir variables in script:
+
+     base_dir =  <base_directory>
+
+     For Example:
+
+     base_dir = "/tmp/felipe/check_pautas"
+
+6) Change pautas source directory in script:
+
+     src_directory_pautas =  <pautas_source_directory>
+
+     For Example:
+
+     src_directory_pautas = "/u00/appl/base/bin"
+
+7) Change list file name in script:
+
+     pautas_list_filename =  <pautas_list_filename>
+
+     For Example:
+
+     pautas_list_filename = "listado_pautas_a_chequear_icalma.txt"
+
+8) Change logs file source directory in script:
+
+     src_directory_logs = <logs_source_directory>
+
+     For example:
+
+     src_directory_logs = "/u03/explota/base_exp/logs"
+
+6) Run the script:
+
+     python check_pautas.py
+
+7) List output_file.txt:
+
+     cat output_file.txt
+
+8) Copy the output_file content and paste in Excel.
+
+     Note: Use "Asistente para importar texto", with Separator option set to:
+
+     - Space ->(unchecked)
+     - Other -> &
+
+9) Check other two files:
+
+     - lista_pautas_a_chequear.txt: Estas pautas no poseen archivo log, o el formato de fecha del archivo log, esta malo, lo cual no           permite determinar cuando corren.
+
+     - lista_pautas_con_errores.txt: Estas pautas no se pudieron copiar al directorio temporal, para ser procesadas, normalmente             ocurre por problemas de permisología.
