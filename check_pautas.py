@@ -4,10 +4,12 @@
 # description     : This script check pautas for a word given.
 # author          : Jesus A. Ruiz
 # date            : 14-06-2016
-# version         : 1.0
+# version         : 1.2
 # usage           : check_pautas.py
 # notes           :
 # python_version  : 2.6.4
+# Changes:
+#       29/06/2016      Change behaviour to process all pautas (with o without log file associated)
 ############################################################################
 
 # Import Modules Section
@@ -22,18 +24,18 @@ import time
 import math
 
 # Global Variables Section
-base_dir =                      "/tmp/felipe/check_pautas"
+base_dir =                      "/tmp/felipe/check_pautas_integrity"
 output_line =                   ""
 run_hostname =                  socket.gethostname()
 output_file =                   base_dir + "/output_file.txt"
-src_directory_pautas =          "/u00/appl/base/bin"
+src_directory_pautas =          "/u03/explota/recup/integrity/debito/pautas"
 dst_directory_pautas =          base_dir + "/pautas_processed"
-pautas_list_filename =          "listado_pautas_a_chequear_icalma.txt"
+pautas_list_filename =          "listado_pautas_a_chequear_integrity.txt"
 pautas_output_filename =        "lista_pautas_con_ftp.txt"
 log_output_filename =           "lista_pautas_con_ftp.log"
 pautas_exception_filename =     "lista_pautas_con_errores.txt"
 pautas_to_check_filename =      "lista_pautas_a_chequear.txt"
-src_directory_logs =            "/u03/explota/base_exp/logs"
+src_directory_logs =            "/u03/explota/recup/integrity/debito/log"
 providers_tuple =               ('ALQUIMIA', 'TCS', 'ALTIUZ', 'TUXPAN', 'PAD SYSTEM', 'BAC', 'PMG', 'ORANG PEOPLE SOFT', 'ANTILHUE', 'LSP', 'EXPERTI')
 user_tuple =                    ('USR=', 'USER=', 'USUFTP=', 'USERFTP=') #, 'TBK4027')
 ftp_tuple =                     ('OPEN', 'CD', 'LCD', 'PUT', 'QUIT', 'FTP', 'DOFTP', 'CLOSE', 'BYE', 'PWDFTP', 'HOSTFTP', 'USUFTP')
@@ -96,7 +98,7 @@ def find_by_regexp(pautaname, regexp):
 
         # Find text by regexp compiled
         for match in regexp_for_find.finditer(file_text):
-                print "%s" % (match.group(0))
+                # print "%s" % (match.group(0))
                 response_list.append(match.group(0))
         response = set(response_list)
         return response
@@ -195,6 +197,7 @@ def add_file_to_results(line_output):
 def get_pauta_log_date(pautaname):
         length_pautaname = len(pautaname)
         extract=pautaname[length_pautaname-15:length_pautaname-7]
+        print ("extract log date ->" %s, extract)
         return extract
 
 def get_weekly_frequency(pautadate):
@@ -215,6 +218,9 @@ def validate_pautadate(pautadate):
                 return False
 
 def find_logs(pautaname):
+        num_reg = 0
+        schedule = "NOT FOUND"
+        time = "NOT FOUND"
         print "Looking for logs file Pauta-> " + pautaname
         try:
                 index = pautaname.index('.')
@@ -230,6 +236,7 @@ def find_logs(pautaname):
                         print "No posee log, sera incluida la pauta en la lista para chequear!!"
                         print "=================================================================="
                         add_file_to_check(pautaname)
+                        schedule = "NOT FOUND"
                 else:
                         # Extract schedule & time
                         schedule_array = [False, False, False, False, False, False, False]
@@ -264,100 +271,102 @@ def find_logs(pautaname):
                                         print "Formato de Fecha invalido, sera incluida la pauta en la lista para chequear!!"
                                         print "=================================================================="
                                         add_file_to_check(pautaname)
-                        if num_reg != 0:
-                                # Extract schedule
-                                schedule = get_schedule_pauta(schedule_array)
-                                time = get_time_pauta_hour(hour_sum, num_reg) + ":" + get_time_pauta_min(min_sum, num_reg)
-                                provider = get_provider(pautaname)
-                                # ftpuser = get_ftpuser(pautaname)
-                                ftpuser = ""
-                                resultados_user = "NOT FOUND"
-                                resultados_lcd = "NOT FOUND"
-                                resultados_put = "NOT FOUND"
-                                resultados_hosts = "NOT FOUND"
-                                resultados_cd = "NOT FOUND"
-                                resultados = find_by_regexp(pautaname, ftp_regexp)
-                                if len(resultados) > 0: # Tiene ftp
-                                        # Buscamos los usuarios de los ftp
-                                        resultados = find_by_regexp(pautaname, user_regexp[0]) # Primera expresion regular sobre user
-                                        if len(resultados) > 0: # Primer filtro
-                                                resultados_user = ""
-                                                for element in resultados:
-                                                        resultados_user = resultados_user + " " + element
-                                        else:
-                                                # Aplicamos el segundo filtro
-                                                resultados = find_by_regexp(pautaname, user_regexp[1]) # Segunda expresion regular sobre user
-                                                if len(resultados) > 0: # Segundo filtro
-                                                        resultados_user = ""
-                                                        for element in resultados:
-                                                                resultados_user = resultados_user + " " + element
-                                                else:
-                                                        resultados_user = "NOT FOUND"
-                                                        print "Pauta no tiene TEXTO USER!!"
-                                        # Buscamos el directorio local del ftp
-                                        resultados = find_by_regexp(pautaname, dir_local_regexp) # Primera expresion regular sobre lcd
-                                        if len(resultados) > 0: # Primer filtro
-                                                resultados_lcd = ""
-                                                for element in resultados:
-                                                        resultados_lcd = resultados_lcd + " " + element
-                                        else:
-                                                resultados_lcd = "NOT FOUND"
-                                                print "Pauta no tiene TEXTO LCD!!"
-                                        # Buscamos el archivo a enviar por ftp
-                                        resultados = find_by_regexp(pautaname, put_regexp) # Primera expresion regular sobre put
-                                        if len(resultados) > 0: # Primer filtro
-                                                resultados_put = ""
-                                                for element in resultados:
-                                                        resultados_put = resultados_put + " " + element
-                                        else:
-                                                resultados_put = "NOT FOUND"
-                                                print "Pauta no tiene TEXTO PUT!!"
+                if num_reg != 0:
+                        # Extract schedule
+                        schedule = get_schedule_pauta(schedule_array)
+                        time = get_time_pauta_hour(hour_sum, num_reg) + ":" + get_time_pauta_min(min_sum, num_reg)
+                provider = get_provider(pautaname)
+                # ftpuser = get_ftpuser(pautaname)
+                ftpuser = ""
+                resultados_user = "NOT FOUND"
+                resultados_lcd = "NOT FOUND"
+                resultados_put = "NOT FOUND"
+                resultados_hosts = "NOT FOUND"
+                resultados_cd = "NOT FOUND"
+                resultados = find_by_regexp(pautaname, ftp_regexp)
+                if len(resultados) > 0: # Tiene ftp
+                        # Buscamos los usuarios de los ftp
+                        resultados = find_by_regexp(pautaname, user_regexp[0]) # Primera expresion regular sobre user
+                        if len(resultados) > 0: # Primer filtro
+                                resultados_user = ""
+                                for element in resultados:
+                                        resultados_user = resultados_user + " " + element
+                        else:
+                                # Aplicamos el segundo filtro
+                                resultados = find_by_regexp(pautaname, user_regexp[1]) # Segunda expresion regular sobre user
+                                if len(resultados) > 0: # Segundo filtro
+                                        resultados_user = ""
+                                        for element in resultados:
+                                                resultados_user = resultados_user + " " + element
+                                else:
+                                        resultados_user = "NOT FOUND"
+                                        print "Pauta no tiene TEXTO USER!!"
 
-                                        # Buscamos los usuarios el hosts del hosts
-                                        resultados = find_by_regexp(pautaname, hosts_regexp[0]) # Primera expresion regular sobre hosts
-                                        if len(resultados) > 0: # Primer filtro
+                        # Buscamos el directorio local del ftp
+                        resultados = find_by_regexp(pautaname, dir_local_regexp) # Primera expresion regular sobre lcd
+                        if len(resultados) > 0: # Primer filtro
+                                resultados_lcd = ""
+                                for element in resultados:
+                                        resultados_lcd = resultados_lcd + " " + element
+                        else:
+                                resultados_lcd = "NOT FOUND"
+                                print "Pauta no tiene TEXTO LCD!!"
+
+                        # Buscamos el archivo a enviar por ftp
+                        resultados = find_by_regexp(pautaname, put_regexp) # Primera expresion regular sobre put
+                        if len(resultados) > 0: # Primer filtro
+                                resultados_put = ""
+                                for element in resultados:
+                                        resultados_put = resultados_put + " " + element
+                        else:
+                                resultados_put = "NOT FOUND"
+                                print "Pauta no tiene TEXTO PUT!!"
+
+                        # Buscamos los usuarios el hosts del hosts
+                        resultados = find_by_regexp(pautaname, hosts_regexp[0]) # Primera expresion regular sobre hosts
+                        if len(resultados) > 0: # Primer filtro
+                                resultados_hosts = ""
+                                for element in resultados:
+                                        resultados_hosts = resultados_hosts + " " + element
+                        else:
+                                # Aplicamos el segundo filtro
+                                resultados = find_by_regexp(pautaname,hosts_regexp[1]) # Segunda expresion regular sobre hosts
+                                if len(resultados) > 0: # Segundo filtro
+                                        resultados_hosts = ""
+                                        for element in resultados:
+                                                resultados_hosts = resultados_hosts + " " + element
+                                else:
+                                        # Aplicamos el tercer filtro
+                                        resultados = find_by_regexp(pautaname,hosts_regexp[2]) # Tercera expresion regular sobre hosts
+                                        if len(resultados) > 0: # Tercer filtro
                                                 resultados_hosts = ""
                                                 for element in resultados:
                                                         resultados_hosts = resultados_hosts + " " + element
                                         else:
-                                                # Aplicamos el segundo filtro
-                                                resultados = find_by_regexp(pautaname,hosts_regexp[1]) # Segunda expresion regular sobre hosts
-                                                if len(resultados) > 0: # Segundo filtro
+                                                # Aplicamos el cuarto filtro
+                                                resultados = find_by_regexp(pautaname,hosts_regexp[3]) # Cuarto expresion regular sobre hosts
+                                                if len(resultados) > 0: # Cuarto filtro
                                                         resultados_hosts = ""
                                                         for element in resultados:
                                                                 resultados_hosts = resultados_hosts + " " + element
                                                 else:
-                                                        # Aplicamos el tercer filtro
-                                                        resultados = find_by_regexp(pautaname,hosts_regexp[2]) # Tercera expresion regular sobre hosts
-                                                        if len(resultados) > 0: # Tercer filtro
-                                                                resultados_hosts = ""
-                                                                for element in resultados:
-                                                                        resultados_hosts = resultados_hosts + " " + element
-                                                        else:
-                                                                # Aplicamos el cuarto filtro
-                                                                resultados = find_by_regexp(pautaname,hosts_regexp[3]) # Cuarto expresion regular sobre hosts
-                                                                if len(resultados) > 0: # Cuarto filtro
-                                                                        resultados_hosts = ""
-                                                                        for element in resultados:
-                                                                                resultados_hosts = resultados_hosts + " " + element
-                                                                else:
-                                                                        resultados_hosts = "NOT FOUND"
-                                                                        print "Pauta no tiene TEXTO HOSTS!!"
-                                        # Buscamos  el directorio destino
-                                        resultados = find_by_regexp(pautaname, dir_regexp) # Primera expresion regular directorio
-                                        if len(resultados) > 0: # Primer filtro
-                                                resultados_cd = ""
-                                                for element in resultados:
-                                                        resultados_cd = resultados_cd + " " + element
-                                        else:
-                                                resultados_cd = "NOT FOUND"
-                                                print "Pauta no tiene TEXTO CD!!"
-                                else:
-                                        print "Pauta no tiene TEXTO FTP!!"
-                                line_output = run_hostname + "&" + pautaname + "&" + schedule + time + "&" + resultados_user + "&" + resultados_lcd + "&" +resultados_put + "&" + resultados_hosts + "&" + resultados_put + "&" + resultados_user + "&" + resultados_cd  + "&" + provider
-                                print line_output
-                                print "=================================================================="
-                                add_file_to_results(line_output)
+                                                        resultados_hosts = "NOT FOUND"
+                                                        print "Pauta no tiene TEXTO HOSTS!!"
+                        # Buscamos  el directorio destino
+                        resultados = find_by_regexp(pautaname, dir_regexp) # Primera expresion regular directorio
+                        if len(resultados) > 0: # Primer filtro
+                                resultados_cd = ""
+                                for element in resultados:
+                                        resultados_cd = resultados_cd + " " + element
+                        else:
+                                resultados_cd = "NOT FOUND"
+                                print "Pauta no tiene TEXTO CD!!"
+                else:
+                        print "Pauta no tiene TEXTO FTP!!"
+                line_output = run_hostname + "&" + pautaname + "&" + schedule + time + "&" + resultados_user + "&" + resultados_lcd + "&" +resultados_put + "&" + resultados_hosts + "&" + resultados_put + "&" + resultados_user + "&" + resultados_cd  + "&" + provider
+                print line_output
+                print "=================================================================="
+                add_file_to_results(line_output)
                 return True
         else:
                 print "LOGS Directory does not exists!"
